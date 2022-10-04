@@ -1,0 +1,553 @@
+// 1) SOLOVAY-STRASSEN.
+
+function SolovayStrassen(n)
+// The operations performed by this function and the defined variables are precisely those of the given document which reports Solovay-Strassen' algorithm.
+
+/*
+INPUT: - n integer to be tested.
+
+OUTPUT: - true/false accordingly to n's primality
+*/
+    
+    Rand := {2..n-1};   // Set of Integers used in the following for loop to select a random Integer among [2,..,n-1].
+    exp := (n-1) div 2; // Exponent used in the following for loop to compute y.
+
+    for _ in [1..10] do
+
+        a := Random(Rand);
+
+        x := JacobiSymbol(a,n); // This function computes the Jacobi's symbol (a/n).
+
+        if x eq 0 then     // In this case GCD(a,n)>1.
+            return false;
+        end if;
+
+        z := x*Modexp(a, exp, n); 
+
+        if z notin {1,-n+1} then
+            return false;
+        end if; 
+
+    end for;
+
+    return true;
+
+end function;
+
+
+// 2) LEHMAN.
+
+// Precomputation of constant values, defined as global variables.
+
+C := [[30], [48,24,24,24], [24,24,48,24], [36,36,72,36], [12,36,24,12,24,12,24,36], [4,2]];
+qr := [ false : _ in {1..720}];
+
+for index in {0..(720 div 2)+1} do
+    qr[Modexp(index,2,720) +1] := true;
+end for;
+
+
+function largeOdd(N,r)
+/*
+This function works as the general function large(), but it is specialized for the case k odd.
+The operations performed by this function and the defined variables are precisely those of the given article which reports Lehman's algorithm.
+
+INPUTS:
+- N is the semiprime;
+- r Integer representing the upper bound for k.
+
+OUTPUTS:
+- p is the smallest prime factor of N if it is found, otherwise p = 1;
+- q is the largest prime factor of N if it is found, otherwise q = N.
+*/
+
+    k := 1;
+
+    while (k le r) do
+
+        w := 4*k*N;
+        x := Ceiling(Sqrt(w));
+        u := x^2 - w;
+
+        j := (Ceiling(Sqrt(N div k))-1) div (4*(r+1));
+
+        i1 := 0;
+        if IsEven(x+k) then
+            i1 := 1;
+            u +:= (2*x) + 1;
+            x +:= 1;
+        end if;
+
+        jump := 4; 
+        if ((k+N-x) mod 4) ne 0 then
+            i1 +:= 2;
+            u +:= 4*(x+1);
+            x +:= 2;
+        end if;
+        
+        for _ in [i1..j+1 by jump] do
+
+            if qr[(u mod 720) +1] eq true then         
+                if IsSquare(u) then
+                    y := Ceiling(Sqrt(u));
+                    t := y^2 - u;
+
+                    p := GCD(N, x-y);
+                    q := N div p;
+
+                    return Min(p,q), Max(p,q);
+                end if;
+            end if;
+
+            u +:= 8*(x+2);
+            x +:= 4;
+            
+        end for;
+
+        k +:= 2;
+
+    end while;
+
+    return 1, N;
+
+end function;
+
+
+function largeEven(N,r,c,m,m0)
+/*
+This function works as the general function large(), but it is specialized for the case k even.
+The operations performed by this function and the defined variables are precisely those of the given article which reports Lehman's algorithm.
+
+INPUTS:
+- N is the semiprime;
+- r Integer representing the upper bound for k;
+- c sequence of Integers representing the jumps which increase k;
+- m is an Integer used as an index to run through c;
+- m0 is an Integer representing the initial value of k;
+
+OUTPUTS:
+- p is the smallest prime factor of N if it is found, otherwise p = 1;
+- q is the largest prime factor of N if it is found, otherwise q = N.
+*/
+
+    s := 1;
+    k := m0;
+
+    k := k + c[s];
+    if s ne m then
+        s +:= 1;
+    end if;
+
+    while (k le r) do
+
+        w := 4*k*N;
+        x := Ceiling(Sqrt(w));
+        u := x^2 - w;
+
+        j := (Ceiling(Sqrt(N div k))-1) div (4*(r+1));
+
+        i1 := 0;
+        if IsEven(x+k) then
+            i1 := 1;
+            u +:= (2*x) + 1;
+            x +:= 1;
+        end if;
+
+        jump := 2;
+
+        for _ in [i1..j+1 by jump] do
+        
+            if qr[(u mod 720) +1] eq true then
+                if IsSquare(u mod N) then
+                    y := Ceiling(Sqrt(u));
+                    t := y^2 - u;
+
+                    p := GCD(N, x-y);
+                    q := N div p;
+
+                    return Min(p,q), Max(p,q);
+                end if;
+            end if;
+
+            u +:= 4*(x+1);
+            x +:= 2;
+            
+        end for;
+        
+        k := k + c[s];
+        if s ne m then
+            s +:= 1;
+        else
+            s := 1;
+        end if;
+
+        
+    end while;
+
+    return 1, N;
+
+end function;
+
+
+function Factorization_Lehman(N)
+/*
+INPUT: - N semiprime to be factored.
+
+OUTPUTS:
+- p is the smallest prime factor of N;
+- q is the largest prime factor of N.
+*/
+
+    r := Ceiling((N^(1/3))/10);    // upper bound for k used in the functions largeEven() and largeOdd().
+
+    // From now on, I follow the given article to update tne inputs for the functions largeEven() and largeOdd().
+    
+    p,q := largeEven(N,r,C[1],1,0);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+
+    p,q := largeEven(N,r,C[2],4,-24);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+
+    p,q := largeEven(N,r,C[3],4,-12);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+
+    p,q := largeEven(N,r,C[4],4,-18);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+
+    p,q := largeEven(N,r,C[5],8,-6);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+    
+    p,q := largeEven(N,r,C[6],2,-2);
+
+    if p gt 1 then
+        return p,q;
+    end if;
+
+    // For the last factorization attempt, I will not use the sequence c since it would simply be c := [2].
+    // Therefore, starting form k := 1, largeOdd() considers as value of k all the odd numbers, by incrementing k by 2 at each round.
+    p,q := largeOdd(N,r);
+
+    return p,q;
+
+end function;
+
+/*
+    NOT NECESSARY : log(p) and log(q) should be of the same size.
+    
+    CubeRoot := N^(1/3);
+    SixthRoot := Sqrt(CubeRoot);
+
+    //First attempt: Try to find a factor of N among all primes up to N^(1/3)
+    for i in PrimesUpTo(Floor(CubeRoot)) do
+
+        if IsDivisibleBy(N,i) then
+            return i, N div i;  //ExactQuotient(N,i)
+        end if;
+
+    end for;
+
+*/
+
+
+// 3) INDEX CALCULUS.
+
+e := Exp(1);
+
+function IndexCalculus(p,g,h)
+/*
+INPUTS:
+- p Sophie-Germain prime (p = 2*q+1, where q is a prime);
+- g primitive root modulo p;
+- h element of Fp*.
+
+OUTPUT:
+- x Integer, such that g^x = h mod p.
+*/
+
+    g := Integers()!g;
+    h := Integers()!h;
+
+    q := (p-1) div 2;
+
+    B := Ceiling(Exp((  (Log(e,p)*  ((Log(e,Log(e,p)))^2)  )  )^(1/3) ));   //Bound used to compute the factor base.
+
+    Primes := PrimesUpTo(Ceiling(B));   // Sequence of primes up to Ceiling(B), stored in ascending order.    
+    PrimesSet := Seqset(Primes);
+    pi := #Primes;
+
+    // rows in an Integer value which will be used in the next while loop (see below for further details).
+    rows := pi/15;
+
+    SetRandom := {2..p-2};
+
+    I := [];    // Sequence of exponents i s.t. gi=h*g^(-i) is B-smooth.   
+    I2 := [];    // Sequence of exponents i mod 2 s.t. gi=h*g^(-i) is B-smooth.
+    Iq := [];    // Sequence of exponents i mod q s.t. gi=h*g^(-i) is B-smooth.
+    SeqExp := [];   // Sequence of the exponents of the factorization of each gi=h*g^(-i) B-smooth.
+
+    while true do
+
+        i := Random(SetRandom);
+        if i notin I then
+            gi := (h*Modexp(g,-i,p)) mod p;
+
+            // We consider -1 as element of the factor base, and so we check wether gi-q>0, if this is the case, then we update gi := gi-p.
+            // The previous check is represented by a variable sign which is equal to 0 iff gi-q<0, otherwise sign := 1.
+            sign := 0;
+            if gi gt q then
+                gi -:= p;
+                sign := 1;
+            end if;
+
+            Factgi := Factorization(gi);           
+            Primesgi := {Factgi[t][1] : t in [1..#Factgi]}; // Set of the primes in the factorization of gi.
+
+            if Primesgi subset PrimesSet then   // This condition is satisfied iff gi is B-smooth.
+
+                // Expgi is a sequence representing the exponent of each element of Primes (considered in ascending order).
+                // For each prime in Primes, the corresponding exponent is initialized as 0 and then it will be updated as e such that (prime)^e||gi. 
+                Expgi := [0 : _ in [1..pi]];
+
+                k := 1;
+                for j in [1..pi] do
+
+                    if Primes[j] in Primesgi then
+                        Expgi[j] := -Factgi[k][2];
+                        k +:= 1;
+                    end if;
+
+                end for;
+
+                Expgi := [1,sign] cat Expgi;
+                I cat:= [i];
+                I2 cat:= [GF(2)!i];
+                Iq cat:= [GF(q)!i];
+                SeqExp cat:= [Expgi];
+
+                if #I gt pi+rows then
+
+                    Sol2 := Solution(Transpose(Matrix(GF(2),SeqExp)),Vector(I2));
+                    Solq := Solution(Transpose(Matrix(GF(q),SeqExp)),Vector(Iq));
+
+                    if Sol2[1] eq Integers()!Solq[1] mod 2 then
+                        Sol := Integers()!Solq[1];
+                    else Sol := Integers()!Solq[1] + q;
+                    end if;
+
+                    if Modexp(g, Sol, p) eq h then
+                        return Sol;
+                    end if;
+
+                end if;
+            end if;
+
+        end if;
+
+    end while;
+    
+end function;
+
+
+// 4) ECDSA
+
+function ECDSA_Signing(q,E,G,r,d,m)
+/*
+INPUTS :
+- q is the number of elements of the finite field over which is defined the curve;
+- E is the elliptic curve;
+- G is the base point of E;
+- r is the order of the point G;
+- d is Alice’s private key;
+- m is the message to be signed.
+
+OUTPUT:
+- (R,s), where R is a point on E and s in an Integer mod r, representing the signature of the message m.
+*/
+
+    // Selection of a random element -r/2 <= e <= r/2 such that e != 0.
+    e := Random({1..r-1});
+    if e gt (r-1) div 2 then
+        e -:= r;
+    end if;
+
+    R := G*e;
+
+    s := ((m+d*(Integers()!R[1]))*Modinv(e,r)) mod r;
+
+    return R,s;
+
+end function;
+
+
+function ECDSA_Verification(q,E,G,r,Q,m,R,s)
+/*
+INPUTS:
+- q is the number of elements of the finite field over which is defined the curve;
+- E is the elliptic curve;
+- G is the base point of E;
+- r is the order of the point G;
+- Q is Alice’s public key;
+- m is the message to be signed;
+- R is the first part of the digital signature;
+- s is the second part of the digital signature.
+
+OUTPUT:
+- true iff the message has correctively been signed.
+*/
+
+    Rx := Integers()!R[1] mod r;
+
+    inv := Modinv(s,r);
+
+    v1 := (m*inv) mod r;
+    v2 := (Rx*inv) mod r;
+
+    P := G*v1 + Q*v2;
+
+    return Integers()!P[1] mod r eq Rx;
+
+end function;
+
+
+
+// 5) ECDLP, FINAL VERSION
+
+function ECDLP_PohligHellman(q,E,P,r,Q)
+// The operations performed by this function and the defined variables are precisely those of the given document which reports Pohlig-Hellman' algorithm.
+
+/*
+INPUTS:
+- q is the number of elements of the finite field over which is defined the curve;
+- E is the elliptic curve;
+- P is the base point of the curve;
+- r is the order of the point P;
+- Q is a multiple of P.
+
+OUTPUT:
+- k Integer, such that Q = k*P.
+*/
+
+    Fact := Factorization(r);
+    NumPrimes := #Fact;
+    Moduli := [Fact[i][1]^(Fact[i][2]) : i in [1..NumPrimes]];
+    k_mod := [0 : _ in [1..NumPrimes]]; // k_mod[i] is k mod Moduli[i].
+
+    for i in [1..NumPrimes] do
+
+        // At the i-th round of this cycle, I consider the i-th prime in Fact and we compute k_mod[i].
+
+        Qprimo := Q;
+        p := Fact[i][1];
+        Z := P*(r div p);
+        
+        T := [E![0,1,0]: i in {1..p}];
+        for i in [2..p] do
+            T[i] := T[i-1]+Z;
+        end for;
+
+        for j in [0..Fact[i][2]-1] do
+
+            W := Qprimo*(r div (p^(j+1)));
+            k := (Position(T,W)-1)*(p^j);
+            k_mod[i] +:= k;
+            Qprimo := Qprimo - P*k;
+
+        end for;
+
+    end for;
+
+    return ChineseRemainderTheorem(k_mod, Moduli);
+
+end function;
+
+
+// 5) ECDLP, SORT VERSION.
+
+function BinarySearch (S,elt)
+/*
+INPUT:
+- S is an ordered sequence
+- elt is an element of the sequence (which is again a sequence of elements in GF(q))
+
+OTPUT:
+- Integer representing the position of elt in S
+*/
+
+    L := 1;
+    R := #S;
+
+    while (L le R) do
+        m := Floor((L+R) div 2);
+        if S[m] lt elt then
+            L := m+1;
+        elif S[m] gt elt then
+            R := m-1;
+        else
+            return m;
+        end if;
+    end while;
+
+end function;
+
+function ECDLP_PohligHellman(q,E,P,r,Q)
+/*
+-q is the number of elements of the finite field over which is defined the curve
+-E is the elliptic curve
+-P is the base point of the curve
+-r is the order of the point P
+-Q is a multiple of P
+*/
+
+    Fact := Factorization(r);
+    NumPrimes := #Fact;
+    Moduli := [Fact[i][1]^(Fact[i][2]) : i in [1..NumPrimes]];
+    k_mod := [0 : _ in [1..NumPrimes]]; // k_mod[i] is k mod Moduli[i].
+
+    for i in [1..NumPrimes] do
+
+        // At the i-th round of this cycle, I consider the i-th prime in Fact and we compute k_mod[i].
+
+        Qprimo := Q;
+        p := Fact[i][1];
+        Z := P*(r div p);
+        
+        K := [0..(p-1)];
+        T := [[] : _ in [1..(p-1)]];
+        App := E![0,1,0];
+        for i in K do
+            T[i+1] := [App[1], App[2]];
+            App := App+Z;
+        end for;
+
+        ParallelSort(~T, ~K);
+
+        for j in [0..Fact[i][2]-1] do
+
+            W := Qprimo*(r div (p^(j+1)));
+            W := [W[1], W[2]];
+            k := (K[BinarySearch(T,W)])*(p^j);
+            k_mod[i] +:= k;
+            Qprimo := Qprimo - P*k;
+
+        end for;
+
+    end for;
+
+    return ChineseRemainderTheorem(k_mod, Moduli);
+
+end function;
